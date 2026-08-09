@@ -506,6 +506,47 @@ textarea.inp{resize:none}
 
 /* ── Locktag SVG support ── */
 .locktag svg{width:11px;height:11px;stroke:var(--ink-3);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ── Scope editor panel ── */
+.scope-panel{position:fixed;top:0;right:0;height:100%;width:min(440px,94vw);background:#fff;z-index:85;
+  box-shadow:-20px 0 50px -20px rgba(0,0,0,.3);transform:translateX(100%);
+  transition:transform .28s cubic-bezier(.4,0,.1,1);display:flex;flex-direction:column}
+.scope-panel.show{transform:none}
+.scope-head{padding:24px 24px 18px;border-bottom:1px solid var(--line)}
+.scope-head h3{font-size:18px;font-weight:750;letter-spacing:-.01em}
+.scope-head p{font-size:13px;color:var(--ink-2);margin-top:5px}
+.scope-body{flex:1;overflow-y:auto;padding:20px 24px}
+.scope-body::-webkit-scrollbar{width:6px}
+.scope-body::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
+.scope-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:10px;background:#fafcfb}
+.scope-foot .btn{flex:1}
+.scope-radio{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;
+  align-items:flex-start;gap:12px;cursor:pointer;margin-bottom:10px;transition:.15s}
+.scope-radio:hover{border-color:var(--brand-100)}
+.scope-radio.sel{background:var(--brand-050);border-color:var(--brand-100)}
+.scope-radio .rdo{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);
+  flex:none;margin-top:2px;display:grid;place-items:center;transition:.15s}
+.scope-radio.sel .rdo{border-color:var(--brand);background:var(--brand)}
+.scope-radio.sel .rdo::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
+.scope-radio h4{font-size:14px;font-weight:650;color:var(--ink)}
+.scope-radio p{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.scope-filter-bar{margin:16px 0 10px}
+.scope-filter-bar label{font-size:12px;font-weight:600;color:var(--ink-2);display:block;margin-bottom:6px}
+.scope-summary{background:var(--brand-050);border:1px solid var(--brand-100);border-radius:10px;
+  padding:10px 14px;font-size:13px;font-weight:600;color:var(--brand-700);margin-bottom:14px}
+.scope-dept-hd{display:flex;align-items:center;gap:10px;padding:9px 4px;cursor:pointer;border-radius:8px;transition:.1s}
+.scope-dept-hd:hover{background:var(--brand-050)}
+.scope-dept-hd .dname{font-size:13.5px;font-weight:700;flex:1;color:var(--ink)}
+.scope-dept-hd .dcnt{font-size:12px;color:var(--ink-3);font-weight:600}
+.scope-emp{display:flex;align-items:center;gap:10px;padding:7px 4px 7px 30px;cursor:pointer;border-radius:8px;transition:.1s}
+.scope-emp:hover{background:var(--brand-050)}
+.scope-emp .ename{font-size:13.5px;flex:1;color:var(--ink)}
+.scbx{width:18px;height:18px;border-radius:5px;border:2px solid var(--line);flex:none;
+  display:grid;place-items:center;transition:.15s;background:#fff}
+.scbx.on{background:var(--brand);border-color:var(--brand)}
+.scbx.ind{background:var(--brand);border-color:var(--brand)}
+.scbx svg{width:11px;height:11px;stroke:#fff;fill:none;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;display:none}
+.scbx.on svg,.scbx.ind svg{display:block}
 </style>
 </head>
 <body>
@@ -667,6 +708,18 @@ textarea.inp{resize:none}
 <div class="modal-box" id="modalBox"><div id="modalInner"></div></div>
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer"><div id="drawerContent"></div></div>
+<div class="scrim" id="scopeScrim" onclick="closeScopeEditor()" style="z-index:84"></div>
+<div class="scope-panel" id="scopePanel">
+  <div class="scope-head">
+    <h3>Choose who this applies to</h3>
+    <p>Pick the scope for Device Binding.</p>
+  </div>
+  <div class="scope-body" id="scopeBody"></div>
+  <div class="scope-foot">
+    <button class="btn ghost" onclick="closeScopeEditor()">Cancel</button>
+    <button class="btn primary" onclick="saveScopeEditor()">Continue</button>
+  </div>
+</div>
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script>
@@ -688,7 +741,8 @@ let store = {};
 function seed(){
   store = {
     settings:{ bindingEnabled:true, regLimit:1, sessionLimit:1, webMode:'otp', cookieDays:120,
-      urgency:{Lost:true, Stolen:true, Damaged:false, Upgraded:false, Other:false} },
+      urgency:{Lost:true, Stolen:true, Damaged:false, Upgraded:false, Other:false},
+      scope:{ mode:'branch', custom:new Set(Object.keys(EMP)) } },
     statusFilter:{Pending:true, Approved:false, Rejected:false},
     urgentOnly:false,
 
@@ -1142,6 +1196,106 @@ function stepper(target, val, min, max, cb, suffix){
 function changeReg(d){ store.settings.regLimit=Math.max(1,Math.min(5,store.settings.regLimit+d)); renderSettings(); renderDevices(); }
 function changeSess(d){ store.settings.sessionLimit=Math.max(1,Math.min(5,store.settings.sessionLimit+d)); renderSettings(); renderDevices(); }
 function changeCookie(d){ store.settings.cookieDays=Math.max(30,Math.min(180,store.settings.cookieDays+d*30)); renderSettings(); }
+/* ── Scope editor ── */
+function getDepts(){
+  const d={};
+  for(const [id,e] of Object.entries(EMP)){ if(!d[e.dept]) d[e.dept]=[]; d[e.dept].push(id); }
+  return d;
+}
+
+let _scopeDraft=null;
+
+function openScopeEditor(){
+  const s=store.settings.scope;
+  _scopeDraft={mode:s.mode, custom:new Set(s.custom)};
+  renderScopeEditor();
+  document.getElementById('scopeScrim').classList.add('show');
+  document.getElementById('scopePanel').classList.add('show');
+}
+
+function closeScopeEditor(){
+  _scopeDraft=null;
+  document.getElementById('scopeScrim').classList.remove('show');
+  document.getElementById('scopePanel').classList.remove('show');
+}
+
+function saveScopeEditor(){
+  store.settings.scope={mode:_scopeDraft.mode, custom:new Set(_scopeDraft.custom)};
+  closeScopeEditor();
+  renderSettings();
+  toast('Scope saved','ok');
+}
+
+function setScopeMode(mode){
+  _scopeDraft.mode=mode;
+  renderScopeEditor();
+}
+
+function toggleDeptScope(dept){
+  const emps=getDepts()[dept];
+  const allOn=emps.every(id=>_scopeDraft.custom.has(id));
+  emps.forEach(id=> allOn ? _scopeDraft.custom.delete(id) : _scopeDraft.custom.add(id));
+  renderScopeEditor();
+}
+
+function toggleEmpScope(id){
+  _scopeDraft.custom.has(id) ? _scopeDraft.custom.delete(id) : _scopeDraft.custom.add(id);
+  renderScopeEditor();
+}
+
+function renderScopeEditor(){
+  const body=document.getElementById('scopeBody');
+  if(!body||!_scopeDraft) return;
+  const depts=getDepts();
+
+  const radio=(mode,title,desc)=>`<div class="scope-radio ${_scopeDraft.mode===mode?'sel':''}" onclick="setScopeMode('${mode}')">
+    <div class="rdo"></div><div><h4>${title}</h4><p>${desc}</p></div></div>`;
+
+  const cbx=(on,ind)=>`<div class="scbx ${ind?'ind':on?'on':''}">
+    <svg viewBox="0 0 24 24">${ind?'<line x1="5" y1="12" x2="19" y2="12"/>':'<polyline points="20 6 9 17 4 12"/>'}</svg></div>`;
+
+  let custom='';
+  if(_scopeDraft.mode==='custom'){
+    const selTotal=_scopeDraft.custom.size;
+    const selDepts=Object.keys(depts).filter(d=>depts[d].some(id=>_scopeDraft.custom.has(id))).length;
+
+    let rows='';
+    for(const [dept,ids] of Object.entries(depts)){
+      const sel=ids.filter(id=>_scopeDraft.custom.has(id)).length;
+      const allOn=sel===ids.length, someOn=sel>0&&sel<ids.length;
+      rows+=`<div class="scope-dept-hd" onclick="toggleDeptScope('${dept}')">
+        ${cbx(allOn,someOn)}<span class="dname">${dept}</span><span class="dcnt">${sel}/${ids.length} selected</span></div>`;
+      ids.forEach(id=>{
+        rows+=`<div class="scope-emp" onclick="toggleEmpScope('${id}')">
+          ${cbx(_scopeDraft.custom.has(id),false)}<span class="ename">${EMP[id].name}</span></div>`;
+      });
+    }
+
+    custom=`<div class="scope-filter-bar">
+        <label>Filter by department</label>
+        <select class="select" style="width:100%">
+          <option>All departments</option>
+          ${Object.keys(depts).map(d=>`<option>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="scope-summary">${selTotal} employee${selTotal!==1?'s':''} selected across ${selDepts} department${selDepts!==1?'s':''}</div>
+      ${rows}`;
+  }
+
+  body.innerHTML=radio('branch','Entire Branch','Track all employees across the organization')
+    +radio('custom','Custom Selection','Select specific departments and employees')
+    +custom;
+}
+
+function scopeLabel(){
+  const sc=store.settings.scope;
+  if(sc.mode==='branch') return 'Entire Branch — all employees';
+  const depts=getDepts();
+  const n=sc.custom.size;
+  const d=Object.keys(depts).filter(dep=>depts[dep].some(id=>sc.custom.has(id))).length;
+  return `${n} employee${n!==1?'s':''} across ${d} department${d!==1?'s':''}`;
+}
+
 function renderSettings(){
   const grid = document.getElementById('settingsGrid');
   if(!grid) return;
@@ -1185,9 +1339,9 @@ function renderSettings(){
     (bOn ? `<div class="applies-strip" style="flex-direction:column;align-items:stretch;gap:3px;padding:12px 20px">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--brand-700)">Applies To</span>
-        <button class="btn ghost sm" onclick="toast('Scope editor — coming in Phase 2','info')" style="padding:4px 10px;font-size:12px">✎ Edit scope</button>
+        <button class="btn ghost sm" onclick="openScopeEditor()" style="padding:4px 10px;font-size:12px">✎ Edit scope</button>
       </div>
-      <div style="font-size:14px;font-weight:600;color:var(--ink);margin-top:1px">Entire Branch — all employees</div>
+      <div style="font-size:14px;font-weight:600;color:var(--ink);margin-top:1px">${scopeLabel()}</div>
     </div>` : '')
   );
 
