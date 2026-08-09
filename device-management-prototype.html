@@ -1182,49 +1182,13 @@ function renderSettings(){
     bOn ? 'Every employee login is checked against their registered device. Unrecognised devices are blocked at the gate.'
         : 'Device checks are off. Employees can log in from any device with no restrictions.',
     sw(bOn, 'toggleBinding()'),
-    (bOn ? `<div class="applies-strip"><span class="scope-lbl">${ic.check} Applies to · All employees, both platforms</span></div>
-    <div class="restricted-remark">${ic.info}<div>When on, login from an unregistered device blocks: <b>attendance check-in, visit logging, task submission, and field reports.</b></div></div>` : '')
-    + banner(bOn, bOn ? 'Enabled — device checks active for all employees' : 'Disabled — no device restrictions applied')
-  );
-
-  const regCard = featCard(
-    ic.layers, false, 'Registered devices per employee',
-    'How many devices can be on file simultaneously. A new device beyond this limit always requires an approved change request — no silent auto-replacement.',
-    step(s.regLimit,'changeReg'),
-    banner(true, `Limit: ${s.regLimit} device${s.regLimit>1?'s':''} per employee`)
-  );
-
-  const sessCard = featCard(
-    ic.users, false, 'Concurrent active sessions',
-    'How many devices can be logged in at the same time. This prevents shared or buddy logins — configured independently of the registration count.',
-    step(s.sessionLimit,'changeSess'),
-    banner(true, `Max ${s.sessionLimit} concurrent session${s.sessionLimit>1?'s':''}`)
-  );
-
-  // ── Platform enforcement ──────────────────────────────
-  const mobileCard = featCard(
-    ic.phone, false, 'Mobile app',
-    'Hardware-bound device ID. A new or unrecognised device triggers a hard block at the login gate — the employee must submit a change request before access is granted.',
-    `<span class="locktag">${ic.lock} Hard admin-gate</span>`,
-    `<div class="applies-strip"><span class="scope-lbl">${ic.lock} Fixed enforcement · anti-buddy-punching control, cannot be relaxed</span></div>`
-    + banner(true, 'Always active · Cannot be disabled')
-  );
-
-  const webCard = featCard(
-    ic.monitor, false, 'Web portal',
-    'No reliable hardware fingerprint in a browser. Choose how an untrusted browser is challenged on login.',
-    `<div class="seg" id="seg-web">
-      <button data-v="otp" class="${s.webMode==='otp'?'on':''}" onclick="setWebMode('otp')">OTP step-up</button>
-      <button data-v="hard" class="${s.webMode==='hard'?'on':''}" onclick="setWebMode('hard')">Hard admin-gate</button>
-    </div>`,
-    banner(true, s.webMode==='otp' ? 'OTP step-up on untrusted browser' : 'Hard admin-gate on untrusted browser')
-  );
-
-  const cookieCard = featCard(
-    ic.clock, false, 'Web trust cookie lifetime',
-    'A signed, httpOnly trust cookie is issued after a successful web login. When it\'s missing or invalid, the browser is challenged again per the web mode above.',
-    step(s.cookieDays,'changeCookie',' d'),
-    banner(true, `Expires after ${s.cookieDays} days`)
+    (bOn ? `<div class="applies-strip" style="flex-direction:column;align-items:stretch;gap:3px;padding:12px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--brand-700)">Applies To</span>
+        <button class="btn ghost sm" onclick="toast('Scope editor — coming in Phase 2','info')" style="padding:4px 10px;font-size:12px">✎ Edit scope</button>
+      </div>
+      <div style="font-size:14px;font-weight:600;color:var(--ink);margin-top:1px">Entire Branch — all employees</div>
+    </div>` : '')
   );
 
   // ── Reason urgency ────────────────────────────────────
@@ -1241,9 +1205,7 @@ function renderSettings(){
 
   grid.innerHTML = `
     <div class="feat-section-title">Company policy</div>
-    ${bindingCard}${regCard}${sessCard}
-    <div class="feat-section-title" style="margin-top:8px">Enforcement by platform</div>
-    ${mobileCard}${webCard}${cookieCard}
+    ${bindingCard}
     <div class="feat-section-title" style="margin-top:8px">Reason categories · default urgency</div>
     ${urgencyCards}
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
